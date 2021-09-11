@@ -69,7 +69,7 @@ All of these variables are *required*.
 
 `S3_CSV_BUCKET`
 
-- Name of the Bucket that used to store newly-rotated or newly-created access key and secret of the user. This bucket is created within `serverless.yml` in `resources:Resources` section. You can remove this section and simply specify your own bucket name.
+- Name of the Bucket that the function uses to store newly-rotated or newly-created access key and secret of the user. This bucket is created within `serverless.yml` in `resources:Resources` section. You can remove this section and simply specify your own bucket name.
 
 `LAST_CHECK_DATE_TAG_KEY`
 
@@ -89,11 +89,11 @@ All of these variables are *required*.
 
 `DEACTIVATE_DAYS`
 
-- After the function rotates the key automatically and informs the user. This variable defines the number of days to keep the key activated. Then the key will be deactivated or disabled. 
+- After the function rotates the key automatically and informs the user. This variable defines the number of days to keep the *old* key activated. Then the *old* key will be deactivated or disabled. 
 
 `DELETION_DAYS`
 
-- After the old key is deactivated by the function. This variable defines number of days to keep it before deletion. 
+- After the *old* key is deactivated by the function. This variable defines number of days to keep it before deletion. 
 
 ### User Notice
 
