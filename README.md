@@ -4,7 +4,7 @@ This function periodically checks all IAM users' access keys that are older than
 
 ## Logic Chart
 
-![flowchar](flowchart.png)
+![flowchar](docs/flowchart.png)
 
 ## Requirements 
 
