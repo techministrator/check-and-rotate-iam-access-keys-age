@@ -1,0 +1,65 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Action": [
+                "s3:ListAllMyBuckets",
+                "s3:GetBucketLocation"
+            ],
+            "Resource": [
+                "arn:aws:s3:::*"
+            ],
+            "Effect": "Allow",
+            "Sid": "AllowGroupToSeeBucketListInTheConsole"
+        },
+        {
+            "Condition": {
+                "StringEquals": {
+                    "s3:prefix": [
+                        "",
+                        "credential/"
+                    ],
+                    "s3:delimiter": [
+                        "/"
+                    ]
+                }
+            },
+            "Action": [
+                "s3:ListBucket"
+            ],
+            "Resource": [
+                "arn:aws:s3:::check-and-rotate-iam-access-keys-age-*"
+            ],
+            "Effect": "Allow",
+            "Sid": "AllowRootAndHomeListingOfCompanyBucket"
+        },
+        {
+            "Condition": {
+                "StringLike": {
+                    "s3:prefix": [
+                        "credential/${aws:username}/*",
+                        "credential/${aws:username}"
+                    ]
+                }
+            },
+            "Action": [
+                "s3:ListBucket"
+            ],
+            "Resource": [
+                "arn:aws:s3:::check-and-rotate-iam-access-keys-age-*"
+            ],
+            "Effect": "Allow",
+            "Sid": "AllowListingOfUserFolder"
+        },
+        {
+            "Action": [
+                "s3:*"
+            ],
+            "Resource": [
+                "arn:aws:s3:::check-and-rotate-iam-access-keys-age-*/credential/${aws:username}/*"
+            ],
+            "Effect": "Allow",
+            "Sid": "AllowAllS3ActionsInUserFolder"
+        }
+    ]
+}

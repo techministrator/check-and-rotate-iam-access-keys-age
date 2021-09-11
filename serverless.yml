@@ -1,0 +1,141 @@
+service: check-and-rotate-iam-access-keys-age
+
+provider:
+  name: aws
+  runtime: python3.8
+  region: ${opt:region, 'ap-southeast-1'}
+  stage: ${opt:stage, 'dev'}
+  tags: 
+    project: ${self:service}
+
+  environment:
+    LAMBDA_FUNCTION_NAME: ${self:service}
+    SES_EMAIL: "no_reply@email.com" 
+    SES_REGION: "ap-southeast-1" 
+    IAM_EMAIL_TAG_KEY: "email" 
+    S3_CSV_BUCKET: !Ref bucketIamUserCredentials
+    LAST_CHECK_DATE_TAG_KEY: "last-check-date"
+    LAST_CHECK_OLD_KEY_TAG_KEY: "last-check-old-key"
+    WARNING_DAYS: "30"
+    OVERDUE_DAYS: "60"
+    DEACTIVATE_DAYS: "10"
+    DELETION_DAYS: "10"
+  
+  iamRoleStatements:
+    - Sid: IAMReadOnly
+      Effect: Allow
+      Action: 
+        - iam:Get*
+        - iam:List*
+        - iam:CreateAccessKey
+        - iam:UpdateAccessKey
+        - iam:DeleteAccessKey
+        - iam:TagUser
+        - iam:UntagUser
+      Resource: "*"
+    - Sid: SESSendEmail
+      Effect: Allow
+      Action: 
+        - ses:SendEmail
+      Resource: "*"
+    - Sid: S3UploadCredentialFile
+      Effect: Allow
+      Action: 
+        - s3:ListBucket
+        - s3:PutObject
+      Resource: 
+        - !GetAtt bucketIamUserCredentials.Arn
+        - !Join 
+          - ''
+          - - !GetAtt bucketIamUserCredentials.Arn
+            - '/*'
+
+functions:
+  funcIAMAccessKeysCheckAndRotate:
+    handler: handler.lambda_handler
+    name: ${self:provider.environment.LAMBDA_FUNCTION_NAME}
+    description: 'Check IAM User Access Keys and Rotate automatically'
+    memorySize: 128
+    timeout: 60
+    events: 
+      - eventBridge:
+          schedule: cron(00 00 */1 * ? *)
+
+resources:
+  Resources: 
+    bucketIamUserCredentials: 
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:provider.environment.LAMBDA_FUNCTION_NAME}-${self:provider.stage}
+        AccessControl: Private
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: True
+          BlockPublicPolicy: True
+          IgnorePublicAcls: True
+          RestrictPublicBuckets: True
+        LifecycleConfiguration:
+          Rules:
+            - Id: DeleteAfter1Week
+              Status: Enabled
+              ExpirationInDays: 7  # Delete Files that contain User's key and secrets
+    
+    groupIamAccessKeyCheckAndRotate:
+      Type: AWS::IAM::Group
+      Properties:
+        GroupName: ${self:provider.environment.LAMBDA_FUNCTION_NAME}-${self:provider.stage}
+
+    policyIamAccessKeyCheckAndRotate:
+      Type: AWS::IAM::Policy
+      Properties:
+        Groups: 
+          - !Ref groupIamAccessKeyCheckAndRotate
+        PolicyName: ${self:provider.environment.LAMBDA_FUNCTION_NAME}-${self:provider.stage}
+        PolicyDocument: 
+          Version: '2012-10-17'
+          Statement:
+          - Sid: AllowGroupToSeeBucketListInTheConsole
+            Action:
+              - s3:ListAllMyBuckets
+              - s3:GetBucketLocation
+            Effect: Allow
+            Resource:
+            - arn:aws:s3:::*
+          - Sid: AllowRootAndHomeListingOfCompanyBucket
+            Action:
+              - s3:ListBucket
+            Effect: Allow
+            Resource: !Sub 'arn:aws:s3:::${bucketIamUserCredentials}'
+            Condition:
+              StringEquals:
+                s3:prefix:
+                  - ''
+                  - credential/
+                s3:delimiter:
+                  - "/"
+          - Sid: AllowListingOfUserFolder
+            Action:
+              - s3:ListBucket
+            Effect: Allow
+            Resource: !Sub 'arn:aws:s3:::${bucketIamUserCredentials}'
+            Condition:
+              StringLike:
+                s3:prefix:
+                - !Join 
+                  - ''
+                  - - 'credential/$'
+                    - '{aws:username}/*'
+                - !Join 
+                  - ''
+                  - - 'credential/$'
+                    - '{aws:username}'
+          - Sid: AllowAllS3ActionsInUserFolder
+            Action:
+              - s3:*
+            Effect: Allow
+            Resource:
+              - !Join 
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref bucketIamUserCredentials
+                  - '/credential/$'
+                  - '{aws:username}/*'
